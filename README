@@ -1,0 +1,45 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=994
+
+Plugin to keep certain registers (specified by the global variable
+g:localRegisters) specific to individual filetypes.  For example, if editing
+a Java file in one window and a Vim script in another, one may want to
+search for a variable name in the Java window that has no bearing in the Vim
+window; however, ordinary functionality would clobber the Vim window search
+register value, requiring the use of search history if the original
+expression was complicated.
+
+This relies on my getVar.vim (vimscript #353).
+
+Mappings (default):
+
+<Leader>im -- used to import one register from another filetype
+
+Commands:
+
+Copyregister -- used to import one register from another filetype (the
+mapping just executes this command)
+
+Customizations:
+
+By default, no registers are localized (so no behavior changes should be
+noticed).  To localize registers, place an assignment to g:localRegisters
+inside your _vimrc:
+
+let g:localRegisters="abcm/"
+
+The above allows registers a, b, c, m and the search register to be
+localized based on filetype (all Vim scripts get one copy, all Java files
+another etc.).
+
+To change the default mapping for importing register contents from another
+filetype, create a normal mode mapping to <Plug>CopyRegister in your _vimrc.
+
+TODO:
+
+- Keith Roberts:  Allow certain filetypes to retain global settings through
+  the use of an option (set through an ftplugin, for example) -- these would
+  inherit the settings of the last window, in all likelihood, rather than
+  setting their own.
+
+- Maybe allow certain filetypes to ALWAYS keep in synch with others?
+
