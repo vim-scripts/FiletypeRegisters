@@ -1,10 +1,20 @@
 " -*- vim -*-
 " FILE: "c:/vim/Vimfiles/plugin/FiletypeRegisters.vim" {{{
-" LAST MODIFICATION: "Thu, 20 May 2004 16:06:53 Eastern Daylight Time"
+" LAST MODIFICATION: "Thu, 20 May 2004 17:00:59 Eastern Daylight Time"
 " (c) Copyright 2004 Hewlett-Packard Development Company, L.P.
 " $Id:$ }}}
 "
-" Version 1.0
+" Version 1.1
+
+" History:
+"
+" 1.0:  Initial version
+"
+" 1.1:  Added ability for different filetypes to have their own set of stored
+" registers.  Note that if a filetype has explicit registers set, it does NOT
+" automatically also get localized storage of the global ones -- they have to
+" be explicitly included in the local version (setup through the call to
+" Setfiletyperegisters).  Suggested by Keith Roberts.
 
 " Plugin to keep certain registers (specified by the global variable
 " g:localRegisters) specific to individual filetypes.  For example, if editing
@@ -25,6 +35,16 @@
 " Copyregister -- used to import one register from another filetype (the
 " mapping just executes this command)
 "
+" Setfiletyperegisters {registers} [filetype]
+"       The first parameter is a set of registers (for example:  abc/) and the
+"       second parameter is the filetype to which to apply these registers.
+"       If the second parameter is left out, the current &filetype setting
+"       will be used.
+"
+"       From an ftplugin file, one can just call Setfiletyperegisters with a
+"       register list.  From _vimrc, one would have to specify the filetype
+"       also (otherwise it would use "vim", the filetype of _vimrc).
+"
 " Customizations:
 "
 " By default, no registers are localized (so no behavior changes should be
@@ -41,11 +61,6 @@
 " filetype, create a normal mode mapping to <Plug>CopyRegister in your _vimrc.
 "
 " TODO:
-"
-" - Keith Roberts:  Allow certain filetypes to retain global settings through
-"   the use of an option (set through an ftplugin, for example) -- these would
-"   inherit the settings of the last window, in all likelihood, rather than
-"   setting their own.
 "
 " - Maybe allow certain filetypes to ALWAYS keep in synch with others?
 
@@ -68,10 +83,23 @@ augroup FiletypeRegisters
   au BufLeave * call <SID>SaveLocalRegisters()
 augroup END
 
+" Try to get filetype registers; if that fails, try to get global registers;
+" if even that fails, just return the empty string
+function! GetLocalRegistersList( ... )
+  if ( a:0 > 0 )
+    let filetype=a:1
+  else
+    let filetype=&ft
+  endif
+  return GetVar( filetype . "_localRegisters", GetVar( "localRegisters", '' ) )
+endfunction
+
 function! s:SetLocalRegisters()
-  let i = 0
-  while ( i < strlen( GetVar( 'localRegisters', '' ) ) )
-    let register = GetVar( 'localRegisters', '' )[i]
+  let   registers=GetLocalRegistersList()
+  let   i        = 0
+
+  while ( i < strlen( registers ) )
+    let register     = registers[i]
     let registerName = <SID>GetRegisterName( register )
 
     if ( exists( "g:" . &ft . "_local" . registerName ) )
@@ -83,9 +111,11 @@ function! s:SetLocalRegisters()
 endfunction
 
 function! s:SaveLocalRegisters()
-  let i = 0
-  while ( i < strlen( GetVar( 'localRegisters', '' ) ) )
-    let register = GetVar( 'localRegisters', '' )[i]
+  let registers=GetLocalRegistersList()
+  let i        = 0
+
+  while ( i < strlen( registers ) )
+    let register = registers[i]
     let registerName = <SID>GetRegisterName( register )
 
     execute "let g:" . &ft . "_local" . registerName . "=@" . register
@@ -106,6 +136,17 @@ function! s:GetRegisterName( reg )
   return ''
 endfunction
 
+function! s:SetFiletypeRegisters( registers, ... )
+  if ( a:0 > 0 )
+    let filetype=a:1
+  else
+    let filetype=&ft
+  endif
+
+  execute "let g:" . filetype . "_localRegisters='" . a:registers . "'"
+endfunction
+com! -nargs=+ Setfiletyperegisters call <SID>SetFiletypeRegisters( <f-args> )
+
 function! s:CopyRegister()
   echo "Register?  "
   let userInput=getchar()
@@ -121,9 +162,6 @@ function! s:CopyRegister()
   if ( registerName == '' )
     echohl User6 | echo "Register " . register . " is invalid." | echohl None
     return
-  elseif ( GetVar( 'localRegisters', '' ) !~ register )
-    echohl User5 | echo "Register " . register . " is global." | echohl None
-    return
   endif
 
   let otherType=input( "Enter other filetype to use to copy register " . register . ":  ", GetVar( "lastUsedFiletype", '' ) )
@@ -135,10 +173,14 @@ function! s:CopyRegister()
   " Used for the next time this mapping is used
   let g:lastUsedFiletype=otherType
 
-  let variableName = "g:" . otherType . "_local" . registerName
+  if ( GetLocalRegistersList( otherType ) !~ register )
+    echohl User5 | echo "Filetype " . otherType . " isn't keeping a local copy of the '" . registerName . "' register." | echohl None
+  else
+    let variableName = "g:" . otherType . "_local" . registerName
 
-  if ( exists( variableName ) )
-    execute "let @" . register . "=" . variableName
+    if ( exists( variableName ) )
+      execute "let @" . register . "=" . variableName
+    endif
   endif
 endfunction
 com! Copyregister call <SID>CopyRegister()
